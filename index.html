@@ -654,13 +654,15 @@ input{-webkit-user-select:text;user-select:text}
 const FB_CONFIG = {
   apiKey: "AIzaSyBSxOefW7eIfl9ih0OBfdHgHv0A4gbVMfA",
   authDomain: "tomx016.firebaseapp.com",
-  databaseURL: "https://tomx016-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  databaseURL: "https://tomx016-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "tomx016",
   storageBucket: "tomx016.firebasestorage.app",
   messagingSenderId: "275863059765",
-  appId: "1:275863059765:web:e06671942e5c85368b607c",
-  measurementId: "G-X4E87DR5P3"
+  appId: "1:275863059765:web:e06671942e5c85368b607c"
 };
+
+firebase.initializeApp(FB_CONFIG);
+const db = firebase.database();
 
 // ─────────────────────────────────────────
 // 🤖 TELEGRAM BOT API KEY
@@ -2112,5 +2114,31 @@ FIREBASE DATABASE STRUCTURE:
     {id}/ → name, host, maxP, prize, players
 
 ═══════════════════════════════════════════════════════════ -->
+</body>
+</html>
+<!-- Your HTML content above -->
+
+<!-- ✅ Firebase (PLACE HERE) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
+<!-- ✅ Then your Firebase config -->
+<script>
+const FB_CONFIG = {
+  apiKey: "YOUR_KEY",
+  authDomain: "your-project.firebaseapp.com",
+  databaseURL: "https://your-project-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "your-project"
+};
+
+firebase.initializeApp(FB_CONFIG);
+const db = firebase.database();
+</script>
+
+<!-- ✅ THEN your main game script -->
+<script>
+/* your full game code here */
+</script>
+
 </body>
 </html>
