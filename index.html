@@ -1,0 +1,2116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>TOM X 016 – Ludo</title>
+
+<!-- ① Telegram Mini App SDK (MUST be first) -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<!-- ② Firebase compat SDKs (Realtime Database) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<style>
+/* ═══════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════ */
+:root{
+  --bg:#0d0820;--bg2:#1a0e38;--bg3:#26165a;
+  --p:#7c3aed;--p2:#a855f7;--p3:#c084fc;
+  --gold:#fbbf24;--gold2:#f59e0b;
+  --red:#ef4444;--grn:#22c55e;--blu:#3b82f6;--ylw:#eab308;
+  --txt:#f1f5f9;--dim:#94a3b8;--dimmer:#475569;
+  --card:rgba(124,58,237,.13);--glass:rgba(255,255,255,.05);
+  --brd:rgba(168,85,247,.22);--brd2:rgba(168,85,247,.45);
+  --r:14px;--r2:10px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;font-size:15px}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 55% at 15% 10%,rgba(124,58,237,.28),transparent),
+             radial-gradient(ellipse 55% 70% at 85% 90%,rgba(59,130,246,.16),transparent);z-index:0}
+#app{position:relative;width:100%;height:100%;overflow:hidden;z-index:1;display:flex;flex-direction:column}
+
+/* ── Screens ── */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;
+  opacity:0;pointer-events:none;transform:translateY(12px);transition:opacity .25s,transform .25s;z-index:2}
+.screen.active{opacity:1;pointer-events:all;transform:none}
+.screen::-webkit-scrollbar{width:3px}
+.screen::-webkit-scrollbar-thumb{background:var(--p);border-radius:2px}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 24px;
+  border:none;border-radius:var(--r2);font-size:14px;font-weight:700;cursor:pointer;
+  transition:all .18s;letter-spacing:.6px;touch-action:manipulation}
+.btn:active{transform:scale(.95)}
+.btn-gold{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1a0820;box-shadow:0 3px 16px rgba(251,191,36,.4)}
+.btn-purple{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;box-shadow:0 3px 14px rgba(124,58,237,.45)}
+.btn-green{background:linear-gradient(135deg,#15803d,#22c55e);color:#fff}
+.btn-red{background:linear-gradient(135deg,#b91c1c,#ef4444);color:#fff}
+.btn-outline{background:transparent;border:1.5px solid var(--p2);color:var(--p3)}
+.btn-dark{background:rgba(255,255,255,.07);border:1px solid var(--brd);color:var(--txt)}
+.btn-sm{padding:8px 16px;font-size:12px}
+.btn-lg{padding:15px 30px;font-size:16px;border-radius:var(--r)}
+.btn-full{width:100%}
+.btn:disabled{opacity:.45;pointer-events:none}
+
+/* ── Inputs ── */
+.input{width:100%;background:rgba(255,255,255,.06);border:1.5px solid var(--brd);border-radius:var(--r2);
+  padding:12px 14px;color:var(--txt);font-size:14px;transition:border .2s;outline:none;-webkit-user-select:text;user-select:text}
+.input:focus{border-color:var(--p2);background:rgba(255,255,255,.09)}
+.input::placeholder{color:var(--dimmer)}
+input{-webkit-user-select:text;user-select:text}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--brd);border-radius:var(--r);backdrop-filter:blur(10px)}
+.label{font-size:11px;color:var(--dim);letter-spacing:.5px;margin-bottom:7px;display:block;text-transform:uppercase}
+.sec-title{font-size:11px;letter-spacing:3px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;font-weight:700}
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--brd2),transparent);margin:14px 0}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.badge-g{background:rgba(34,197,94,.15);color:var(--grn);border:1px solid rgba(34,197,94,.3)}
+.badge-r{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.badge-gold{background:rgba(251,191,36,.15);color:var(--gold);border:1px solid rgba(251,191,36,.3)}
+.badge-p{background:rgba(168,85,247,.15);color:var(--p3);border:1px solid rgba(168,85,247,.3)}
+.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}
+
+/* ── Page header ── */
+.page-hdr{display:flex;align-items:center;gap:10px;padding:13px 15px 8px;
+  position:sticky;top:0;z-index:20;background:rgba(13,8,32,.92);backdrop-filter:blur(12px)}
+.back-btn{width:36px;height:36px;border-radius:50%;background:var(--glass);border:1px solid var(--brd);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;flex-shrink:0;touch-action:manipulation}
+.page-title{font-size:15px;font-weight:800;letter-spacing:.8px}
+
+/* ── Toast ── */
+#toasts{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none}
+.toast-msg{background:linear-gradient(135deg,#1a0e35,#251550);border:1px solid var(--p2);
+  border-radius:50px;padding:9px 20px;font-size:13px;font-weight:600;white-space:nowrap;
+  box-shadow:0 4px 20px rgba(0,0,0,.5);animation:tIn .25s ease,tOut .25s ease 2.3s forwards}
+@keyframes tIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes tOut{to{opacity:0;transform:translateY(-10px)}}
+
+/* ── Confetti ── */
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:8000;overflow:hidden}
+.conf{position:absolute;top:-10px;border-radius:2px;animation:cfFall linear forwards}
+@keyframes cfFall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
+
+/* ── Popup overlay ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;
+  justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .22s;backdrop-filter:blur(5px)}
+.overlay.open{opacity:1;pointer-events:all}
+.popup{background:linear-gradient(160deg,#1a0e35,#0d0820);border:1px solid var(--brd2);border-radius:20px;
+  padding:22px;width:100%;max-width:390px;position:relative;transform:translateY(16px);transition:transform .22s}
+.overlay.open .popup{transform:none}
+.popup-x{position:absolute;top:13px;right:13px;width:28px;height:28px;border-radius:50%;background:var(--glass);
+  border:1px solid var(--brd);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--dim)}
+
+/* ═══════════════════════════════════════
+   LOADING SCREEN
+═══════════════════════════════════════ */
+#s-loading{align-items:center;justify-content:center;background:var(--bg);z-index:100}
+.load-logo{font-size:30px;font-weight:900;letter-spacing:3px;
+  background:linear-gradient(135deg,#fbbf24,#ec4899,#a855f7);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:logoGlow 1.6s alternate infinite}
+@keyframes logoGlow{from{filter:drop-shadow(0 0 6px rgba(251,191,36,.4))}to{filter:drop-shadow(0 0 24px rgba(251,191,36,.9))}}
+.load-sub{font-size:10px;letter-spacing:5px;color:var(--p3);margin-top:5px;text-transform:uppercase}
+.load-bar-wrap{width:220px;height:4px;background:rgba(255,255,255,.08);border-radius:4px;margin-top:28px;overflow:hidden}
+.load-bar{height:100%;width:0;background:linear-gradient(90deg,var(--p),var(--gold));transition:width .1s}
+.load-status{font-size:11px;color:var(--dimmer);margin-top:9px}
+
+/* ═══════════════════════════════════════
+   HOME SCREEN
+═══════════════════════════════════════ */
+#s-home{padding-bottom:calc(64px + var(--safe-bottom))}
+.home-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 15px}
+.home-logo{font-size:18px;font-weight:900;letter-spacing:2px;
+  background:linear-gradient(135deg,var(--gold),#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.user-chip{display:flex;align-items:center;gap:8px;cursor:pointer;
+  background:var(--glass);border:1px solid var(--brd);border-radius:50px;padding:5px 12px 5px 5px}
+.uav{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;border:2px solid var(--p2);flex-shrink:0}
+.uname{font-size:12px;font-weight:700;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-banner{margin:0 14px 14px;border-radius:var(--r);
+  background:linear-gradient(135deg,rgba(124,58,237,.35),rgba(59,130,246,.22));
+  border:1px solid var(--brd2);padding:20px}
+.banner-h{font-size:22px;font-weight:900;background:linear-gradient(135deg,var(--gold),#fff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1}
+.banner-s{font-size:11px;color:var(--dim);margin-top:4px;line-height:1.4}
+.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px;margin-bottom:12px}
+.hcard{background:var(--card);border:1px solid var(--brd);border-radius:var(--r);
+  padding:16px;cursor:pointer;transition:all .18s;display:flex;flex-direction:column;align-items:center;gap:8px;touch-action:manipulation}
+.hcard:active{transform:scale(.95);border-color:var(--p2)}
+.hcard.feat{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.06)}
+.hcard-icon{font-size:28px}
+.hcard-title{font-size:11px;font-weight:800;letter-spacing:.8px;text-align:center}
+.hcard-sub{font-size:10px;color:var(--dim);text-align:center}
+.status-bar{margin:0 14px 12px;display:flex;align-items:center;gap:8px;
+  background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:50px;padding:8px 14px}
+.sdot{width:7px;height:7px;border-radius:50%}
+.sdot.on{background:var(--grn);animation:sdotBlink 2s infinite}
+.sdot.off{background:var(--red)}
+@keyframes sdotBlink{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ═══════════════════════════════════════
+   CREATE / JOIN FORMS
+═══════════════════════════════════════ */
+.form-wrap{padding:0 14px calc(80px + var(--safe-bottom))}
+.form-sec{background:var(--card);border:1px solid var(--brd);border-radius:var(--r);padding:15px;margin-bottom:10px}
+.mode-grid{display:grid;gap:7px}
+.mg2{grid-template-columns:1fr 1fr}
+.mg4{grid-template-columns:repeat(4,1fr)}
+.mg3{grid-template-columns:repeat(3,1fr)}
+.mdbtn{padding:10px 6px;border-radius:var(--r2);background:rgba(255,255,255,.04);
+  border:2px solid var(--brd);color:var(--dimmer);font-size:11px;font-weight:700;
+  letter-spacing:.5px;cursor:pointer;transition:all .18s;text-align:center;touch-action:manipulation}
+.mdbtn.on{border-color:var(--gold);color:var(--gold);background:rgba(251,191,36,.08)}
+.code-preview{font-size:22px;font-weight:900;letter-spacing:7px;color:var(--gold);text-align:center;padding:9px 0}
+
+/* ═══════════════════════════════════════
+   LOBBY SCREEN
+═══════════════════════════════════════ */
+#s-lobby{padding-bottom:calc(80px + var(--safe-bottom))}
+.lobby-code-box{margin:6px 14px;text-align:center;
+  background:linear-gradient(135deg,rgba(251,191,36,.1),rgba(124,58,237,.1));
+  border:1px solid rgba(251,191,36,.3);border-radius:var(--r);padding:15px}
+.lcode{font-size:28px;font-weight:900;letter-spacing:8px;color:var(--gold)}
+.lobby-players{display:flex;flex-direction:column;gap:8px;padding:8px 14px}
+.lp-slot{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--brd);border-radius:var(--r2);padding:12px}
+.lp-slot.empty{border-style:dashed;opacity:.4}
+.lp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.lp-name{font-weight:700;font-size:14px}
+.lp-sub{font-size:11px;color:var(--dim)}
+
+/* ═══════════════════════════════════════
+   GAME SCREEN
+═══════════════════════════════════════ */
+#s-game{padding:0;overflow:hidden}
+.game-shell{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.gtop{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;background:rgba(8,4,20,.96);border-bottom:1px solid var(--brd);flex-shrink:0}
+.glogo{font-size:13px;font-weight:900;letter-spacing:1.5px;
+  background:linear-gradient(135deg,var(--gold),#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.turn-badge{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:50px;
+  border:1.5px solid;font-size:12px;font-weight:700;transition:all .3s}
+.tdot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.timer-val{font-size:16px;font-weight:900;min-width:30px;text-align:center;transition:color .3s}
+/* Player panels */
+.panels{display:flex;gap:4px;padding:5px 8px;background:rgba(8,4,20,.85);flex-shrink:0;overflow-x:auto}
+.panel{flex:1;min-width:0;border:1.5px solid;border-radius:8px;padding:5px 4px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .35s;flex-shrink:0}
+.panel.myturn{animation:panelPulse 1s infinite alternate}
+@keyframes panelPulse{from{box-shadow:none}to{box-shadow:0 0 14px currentColor}}
+.pav{font-size:15px}
+.pname{font-size:8px;font-weight:800;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:100%;text-align:center}
+.pscore{font-size:10px;font-weight:700}
+.ptoks{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}
+.ptok{width:5px;height:5px;border-radius:50%;opacity:.2}
+.ptok.done{opacity:1}
+/* Board */
+.board-area{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:4px;min-height:0}
+#board{border-radius:8px;display:block;cursor:pointer;touch-action:none;
+  box-shadow:0 0 32px rgba(124,58,237,.45),0 0 72px rgba(124,58,237,.15)}
+/* Emoji reactions */
+.reacts{display:flex;align-items:center;padding:4px 8px;background:rgba(8,4,20,.85);flex-shrink:0;gap:4px;overflow-x:auto}
+.react-btn{font-size:19px;background:none;border:none;cursor:pointer;padding:3px 5px;transition:transform .15s;touch-action:manipulation}
+.react-btn:active{transform:scale(1.45)}
+/* Bottom controls */
+.gbot{background:rgba(8,4,20,.97);border-top:1px solid var(--brd);flex-shrink:0}
+.bot-row{display:flex;height:90px}
+.dice-side{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;padding:8px 12px;border-right:1px solid var(--brd);min-width:108px}
+/* ── Physical dice ── */
+.dice{width:52px;height:52px;background:linear-gradient(145deg,#fffef8,#e8e0f0);border-radius:10px;
+  display:grid;grid-template-areas:'a b c' 'd e f' 'g h i';grid-template-columns:1fr 1fr 1fr;
+  padding:7px;gap:3px;box-shadow:0 5px 12px rgba(0,0,0,.6),inset 0 1px 4px rgba(255,255,255,.9);
+  cursor:pointer;touch-action:manipulation;transition:transform .14s}
+.dice:active{transform:scale(.9)}
+.dice.roll{animation:dRoll .42s ease-in-out}
+@keyframes dRoll{0%,100%{transform:rotate(0)}28%{transform:rotate(-18deg) scale(1.1)}72%{transform:rotate(18deg) scale(1.1)}}
+.dot{border-radius:50%;background:#1a0820;opacity:0;transition:opacity .08s;width:100%;height:100%}
+.dot.on{opacity:1}
+.dlbl{font-size:8px;font-weight:700;letter-spacing:.5px;color:var(--dim);text-transform:uppercase}
+/* Chat side */
+.chat-side{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chat-log{flex:1;overflow-y:auto;padding:5px 8px;display:flex;flex-direction:column;gap:2px}
+.chat-log::-webkit-scrollbar{width:2px}
+.chat-line{font-size:11px;color:var(--dim);line-height:1.3}
+.chat-line .cn{font-weight:700}
+.chat-inp-row{display:flex;gap:4px;padding:4px 8px;border-top:1px solid var(--brd)}
+.chat-inp{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--brd);border-radius:20px;
+  padding:5px 10px;color:var(--txt);font-size:11px;outline:none;-webkit-user-select:text;user-select:text}
+.chat-send{background:var(--p);border:none;border-radius:50%;width:26px;height:26px;
+  color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation}
+/* Float emoji */
+.float-em{position:fixed;pointer-events:none;z-index:7000;font-size:26px;
+  animation:floatUp 2.2s ease-out forwards}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-130px)}}
+
+/* ═══════════════════════════════════════
+   LEADERBOARD
+═══════════════════════════════════════ */
+#s-lb{padding-bottom:calc(68px + var(--safe-bottom))}
+.lb-top3{display:flex;justify-content:center;align-items:flex-end;gap:10px;padding:16px 14px 8px}
+.lb-slot{display:flex;flex-direction:column;align-items:center;gap:4px}
+.lb-av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;border:2px solid}
+.lb-av.r1{width:62px;height:62px;border-color:var(--gold);box-shadow:0 0 14px rgba(251,191,36,.4)}
+.lb-av.r2{width:50px;height:50px;border-color:#9ca3af}
+.lb-av.r3{width:44px;height:44px;border-color:#92400e}
+.lb-nm{font-size:10px;font-weight:700;max-width:68px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-pts-sm{font-size:11px;color:var(--gold);font-weight:700}
+.lb-base{border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center;font-weight:900}
+.lb-base.r1{height:52px;width:62px;background:rgba(251,191,36,.13);font-size:14px}
+.lb-base.r2{height:40px;width:52px;background:rgba(156,163,175,.08);font-size:13px}
+.lb-base.r3{height:30px;width:48px;background:rgba(146,64,14,.08);font-size:12px}
+.lb-row{display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--card);
+  border:1px solid var(--brd);border-radius:var(--r2);margin-bottom:6px}
+.lb-row.me{border-color:var(--gold);background:rgba(251,191,36,.05)}
+.lb-rank{font-size:12px;font-weight:700;color:var(--dim);width:20px;text-align:center;flex-shrink:0}
+.lb-rank.g{color:var(--gold)}.lb-rank.s{color:#9ca3af}.lb-rank.b{color:#92400e}
+.lb-info{flex:1;min-width:0}
+.lb-name{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-sub{font-size:10px;color:var(--dim)}
+.lb-pts{font-size:13px;font-weight:700;color:var(--gold)}
+
+/* ═══════════════════════════════════════
+   BOTTOM NAV
+═══════════════════════════════════════ */
+#bnav{position:fixed;bottom:0;left:0;right:0;z-index:50;display:none;
+  background:rgba(8,4,20,.97);border-top:1px solid var(--brd);
+  padding:6px 0 calc(6px + var(--safe-bottom))}
+.bnav-inner{display:flex}
+.bni{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;
+  cursor:pointer;touch-action:manipulation}
+.bni-icon{font-size:19px;transition:transform .18s}
+.bni-lbl{font-size:8px;font-weight:700;letter-spacing:1px;color:var(--dimmer);text-transform:uppercase}
+.bni.active .bni-lbl{color:var(--gold)}
+.bni.active .bni-icon{transform:scale(1.12)}
+.bni:active .bni-icon{transform:scale(.9)}
+
+/* ── Result popup ── */
+.res-trophy{font-size:54px;display:block;text-align:center;margin-bottom:8px;animation:tropB .6s ease-out}
+@keyframes tropB{0%{transform:scale(0) rotate(-12deg)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+.res-winner{font-size:18px;font-weight:900;text-align:center;color:var(--gold)}
+.res-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.rs{background:var(--glass);border-radius:9px;padding:10px;text-align:center}
+.rs-n{font-size:17px;font-weight:900;color:var(--gold)}
+.rs-l{font-size:9px;color:var(--dim);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+
+/* ── Profile popup ── */
+.pav-wrap{position:relative;width:76px;height:76px;margin:0 auto 12px;cursor:pointer}
+.pav-big{width:76px;height:76px;border-radius:50%;border:3px solid var(--gold);
+  display:flex;align-items:center;justify-content:center;font-size:32px;background:linear-gradient(135deg,#251550,#1a0e35)}
+.pav-edit{position:absolute;bottom:0;right:0;width:22px;height:22px;border-radius:50%;
+  background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:11px}
+.epicker{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-top:8px;max-height:130px;overflow-y:auto}
+.ep-opt{font-size:20px;cursor:pointer;padding:4px;border-radius:7px;text-align:center;
+  transition:background .14s;border:2px solid transparent;touch-action:manipulation}
+.ep-opt.sel,.ep-opt:hover{background:rgba(124,58,237,.25);border-color:var(--p2)}
+.stats-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:12px}
+.stat-b{background:var(--glass);border:1px solid var(--brd);border-radius:var(--r2);padding:9px;text-align:center}
+.stat-n{font-size:18px;font-weight:900;color:var(--gold)}
+.stat-l{font-size:9px;color:var(--dim);letter-spacing:.5px;margin-top:2px;text-transform:uppercase}
+
+/* ── Tournament cards ── */
+.tc{margin:6px 14px;background:var(--card);border:1px solid var(--brd);border-radius:var(--r);overflow:hidden;cursor:pointer}
+.tc:active{border-color:var(--p2)}
+.tc-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--brd)}
+.tc-t{font-size:13px;font-weight:800;letter-spacing:.5px}
+.tc-body{padding:10px 13px;font-size:12px;color:var(--dim);display:flex;align-items:center}
+.tc-ps{padding:7px 13px;border-top:1px solid var(--brd);display:flex;gap:5px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div id="toasts"></div>
+<div id="confetti"></div>
+
+<div id="app">
+
+<!-- ════ LOADING ════ -->
+<div class="screen active" id="s-loading">
+  <div class="load-logo">TOM X 016</div>
+  <div class="load-sub">Ludo Online</div>
+  <div class="load-bar-wrap"><div class="load-bar" id="lbar"></div></div>
+  <div class="load-status" id="lstatus">Connecting to Firebase…</div>
+</div>
+
+<!-- ════ HOME ════ -->
+<div class="screen" id="s-home">
+  <div class="home-hdr">
+    <div class="home-logo">TOM X 016</div>
+    <div class="user-chip" onclick="openProfile()">
+      <div class="uav" id="hav" style="background:linear-gradient(135deg,#7c3aed,#ec4899)">😎</div>
+      <span class="uname" id="hname">Loading…</span>
+    </div>
+  </div>
+  <div class="home-banner">
+    <div class="banner-h">PLAY LUDO<br>ONLINE NOW</div>
+    <div class="banner-s">Real-time multiplayer via Firebase<br>Works inside Telegram groups</div>
+    <div style="display:flex;gap:8px;margin-top:13px">
+      <button class="btn btn-gold btn-sm" onclick="goTo('s-create')">🎮 Create Room</button>
+      <button class="btn btn-outline btn-sm" onclick="goTo('s-join')">🚪 Join Room</button>
+    </div>
+  </div>
+  <div class="status-bar">
+    <div class="sdot" id="sdot"></div>
+    <span style="font-size:12px;color:var(--dim)">Firebase: <span id="fb-status" style="color:var(--grn);font-weight:700">Connecting…</span></span>
+  </div>
+  <div class="home-grid">
+    <div class="hcard feat" onclick="goTo('s-create')">
+      <div class="hcard-icon">🎲</div>
+      <div class="hcard-title">CREATE ROOM</div>
+      <div class="hcard-sub">Host a game</div>
+    </div>
+    <div class="hcard" onclick="goTo('s-join')">
+      <div class="hcard-icon">🚪</div>
+      <div class="hcard-title">JOIN ROOM</div>
+      <div class="hcard-sub">Enter code</div>
+    </div>
+    <div class="hcard" onclick="goTo('s-tourney')">
+      <div class="hcard-icon">🏆</div>
+      <div class="hcard-title">TOURNAMENT</div>
+      <div class="hcard-sub">Create or join</div>
+    </div>
+    <div class="hcard" onclick="navTo('s-lb','lb');renderLB()">
+      <div class="hcard-icon">📊</div>
+      <div class="hcard-title">LEADERBOARD</div>
+      <div class="hcard-sub">Rankings</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ CREATE ════ -->
+<div class="screen" id="s-create">
+  <div class="page-hdr">
+    <div class="back-btn" onclick="goTo('s-home')">←</div>
+    <div class="page-title">Create Room</div>
+  </div>
+  <div class="form-wrap">
+    <div class="form-sec">
+      <label class="label">Room Name</label>
+      <input class="input" id="cr-name" placeholder="My Ludo Room" maxlength="24">
+    </div>
+    <div class="form-sec">
+      <label class="label">Players</label>
+      <div class="mode-grid mg2">
+        <button class="mdbtn on" id="cr-2" onclick="selOpt('players','2',this)">👤 2 Players</button>
+        <button class="mdbtn" id="cr-4" onclick="selOpt('players','4',this)">👥 4 Players</button>
+      </div>
+    </div>
+    <div class="form-sec">
+      <label class="label">Turn Timer</label>
+      <div class="mode-grid mg4">
+        <button class="mdbtn" onclick="selOpt('timer','15',this)">15s</button>
+        <button class="mdbtn on" onclick="selOpt('timer','30',this)">30s</button>
+        <button class="mdbtn" onclick="selOpt('timer','60',this)">60s</button>
+        <button class="mdbtn" onclick="selOpt('timer','0',this)">OFF</button>
+      </div>
+    </div>
+    <div class="form-sec" style="background:rgba(251,191,36,.06);border-color:rgba(251,191,36,.28)">
+      <div class="sec-title">Your Room Code</div>
+      <div class="code-preview" id="preview-code">——</div>
+      <div style="font-size:11px;color:var(--dim);text-align:center">Share with friends to join</div>
+    </div>
+    <button class="btn btn-gold btn-lg btn-full" onclick="Room.create()">🚀 Create &amp; Copy Code</button>
+    <button class="btn btn-outline btn-full mt8" onclick="Room.shareTG()">✈️ Share via Telegram</button>
+  </div>
+</div>
+
+<!-- ════ JOIN ════ -->
+<div class="screen" id="s-join">
+  <div class="page-hdr">
+    <div class="back-btn" onclick="goTo('s-home')">←</div>
+    <div class="page-title">Join Room</div>
+  </div>
+  <div class="form-wrap">
+    <div class="form-sec">
+      <label class="label">Enter Room Code</label>
+      <input class="input" id="join-code" placeholder="ABC123"
+        style="font-size:22px;text-align:center;letter-spacing:6px;font-weight:900;text-transform:uppercase"
+        oninput="this.value=this.value.toUpperCase()" maxlength="8">
+      <button class="btn btn-gold btn-full mt8" onclick="Room.join()">🎮 Join Game</button>
+    </div>
+    <div style="text-align:center;font-size:12px;color:var(--dim);padding:8px 0">
+      Ask the host to share their 6-letter room code
+    </div>
+  </div>
+</div>
+
+<!-- ════ LOBBY ════ -->
+<div class="screen" id="s-lobby">
+  <div class="page-hdr">
+    <div class="back-btn" onclick="Room.leave()">←</div>
+    <div class="page-title" id="lobby-title">Lobby</div>
+  </div>
+  <div class="lobby-code-box">
+    <div style="font-size:11px;color:var(--dim);margin-bottom:5px">Share this code</div>
+    <div class="lcode" id="lcode">——</div>
+    <button class="btn btn-dark btn-sm mt8" onclick="copyCode()">📋 Copy Code</button>
+  </div>
+  <div class="lobby-players" id="lobby-players"></div>
+  <div style="padding:0 14px;margin-top:6px">
+    <div class="form-sec" style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px">
+        <span style="color:var(--dim)">Max players</span><span id="lob-max">2</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px">
+        <span style="color:var(--dim)">Turn timer</span><span id="lob-timer">30s</span>
+      </div>
+    </div>
+    <button class="btn btn-gold btn-lg btn-full" id="start-btn" onclick="Room.startGame()" style="display:none">⚔️ Start Game</button>
+    <div id="wait-msg" style="text-align:center;color:var(--dim);font-size:13px;padding:8px">⏳ Waiting for host to start…</div>
+    <button class="btn btn-outline btn-full mt8" onclick="Room.shareTG()">✈️ Invite via Telegram</button>
+  </div>
+</div>
+
+<!-- ════ GAME ════ -->
+<div class="screen" id="s-game">
+  <div class="game-shell">
+    <div class="gtop">
+      <div class="glogo">TOM X 016</div>
+      <div class="turn-badge" id="turn-badge">
+        <div class="tdot" id="tdot"></div>
+        <span id="tname">Loading…</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="timer-val" id="timer-val" style="color:var(--gold)">—</div>
+        <button class="btn btn-dark btn-sm" onclick="Room.quit()" style="padding:5px 10px;font-size:11px">✕</button>
+      </div>
+    </div>
+    <div class="panels" id="panels"></div>
+    <div class="board-area">
+      <canvas id="board"></canvas>
+    </div>
+    <div class="reacts">
+      <button class="react-btn" onclick="sendReact('🎲')">🎲</button>
+      <button class="react-btn" onclick="sendReact('🔥')">🔥</button>
+      <button class="react-btn" onclick="sendReact('😂')">😂</button>
+      <button class="react-btn" onclick="sendReact('😱')">😱</button>
+      <button class="react-btn" onclick="sendReact('💀')">💀</button>
+      <button class="react-btn" onclick="sendReact('👑')">👑</button>
+      <button class="react-btn" onclick="sendReact('🎉')">🎉</button>
+      <button class="react-btn" onclick="sendReact('🤣')">🤣</button>
+    </div>
+    <div class="gbot">
+      <div class="bot-row">
+        <div class="dice-side">
+          <div class="dice" id="dice-el" onclick="Game.rollDice()">
+            <div class="dot" id="da"></div><div class="dot" id="db"></div><div class="dot" id="dc"></div>
+            <div class="dot" id="dd"></div><div class="dot" id="de"></div><div class="dot" id="df"></div>
+            <div class="dot" id="dg"></div><div class="dot" id="dh"></div><div class="dot" id="di"></div>
+          </div>
+          <div class="dlbl" id="dlbl">TAP DICE</div>
+        </div>
+        <div class="chat-side">
+          <div class="chat-log" id="chat-log"></div>
+          <div class="chat-inp-row">
+            <input class="chat-inp" id="chat-inp" placeholder="Message…" maxlength="80"
+                   onkeydown="if(event.key==='Enter')sendChat()">
+            <button class="chat-send" onclick="sendChat()">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ LEADERBOARD ════ -->
+<div class="screen" id="s-lb">
+  <div class="page-hdr">
+    <div class="back-btn" onclick="goTo('s-home')">←</div>
+    <div class="page-title">Leaderboard</div>
+  </div>
+  <div class="lb-top3" id="lb-top3"></div>
+  <div style="padding:0 14px 80px" id="lb-list"></div>
+</div>
+
+<!-- ════ TOURNAMENT ════ -->
+<div class="screen" id="s-tourney">
+  <div class="page-hdr">
+    <div class="back-btn" onclick="goTo('s-home')">←</div>
+    <div class="page-title">Tournament</div>
+    <button class="btn btn-sm btn-gold" style="margin-left:auto" onclick="openTourCreate()">+ Create</button>
+  </div>
+  <div style="padding:0 0 80px">
+    <div id="tour-list" style="padding-top:8px">
+      <div style="text-align:center;color:var(--dim);padding:32px;font-size:13px">No tournaments.<br>Tap <b>+ Create</b>!</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- #app -->
+
+<!-- ════ BOTTOM NAV ════ -->
+<div id="bnav">
+  <div class="bnav-inner">
+    <div class="bni active" id="bni-home" onclick="navTo('s-home','home')"><div class="bni-icon">🏠</div><div class="bni-lbl">Home</div></div>
+    <div class="bni" id="bni-play" onclick="navTo('s-create','play')"><div class="bni-icon">🎮</div><div class="bni-lbl">Play</div></div>
+    <div class="bni" id="bni-tourney" onclick="navTo('s-tourney','tourney')"><div class="bni-icon">🏆</div><div class="bni-lbl">Tourney</div></div>
+    <div class="bni" id="bni-lb" onclick="navTo('s-lb','lb');renderLB()"><div class="bni-icon">📊</div><div class="bni-lbl">Ranks</div></div>
+    <div class="bni" id="bni-profile" onclick="openProfile()"><div class="bni-icon">👤</div><div class="bni-lbl">Profile</div></div>
+  </div>
+</div>
+
+<!-- ════ PROFILE POPUP ════ -->
+<div class="overlay" id="pop-profile">
+  <div class="popup">
+    <div class="popup-x" onclick="closeProfile()">✕</div>
+    <div style="text-align:center">
+      <div class="pav-wrap" onclick="toggleEP()">
+        <div class="pav-big" id="pav-big">😎</div>
+        <div class="pav-edit">✏️</div>
+      </div>
+      <div id="ep-wrap" style="display:none"><div class="epicker" id="epicker"></div></div>
+    </div>
+    <label class="label mt8">Your Name</label>
+    <input class="input" id="pp-name" placeholder="Enter your name" maxlength="20">
+    <label class="label mt8">Telegram Username</label>
+    <input class="input" id="pp-tg" placeholder="@username (optional)">
+    <div class="stats-g">
+      <div class="stat-b"><div class="stat-n" id="pp-wins">0</div><div class="stat-l">Wins</div></div>
+      <div class="stat-b"><div class="stat-n" id="pp-games">0</div><div class="stat-l">Games</div></div>
+      <div class="stat-b"><div class="stat-n" id="pp-pts">0</div><div class="stat-l">Points</div></div>
+    </div>
+    <button class="btn btn-gold btn-full mt12" onclick="saveProfile()">💾 Save Profile</button>
+  </div>
+</div>
+
+<!-- ════ TOURNAMENT CREATE POPUP ════ -->
+<div class="overlay" id="pop-tour">
+  <div class="popup">
+    <div class="popup-x" onclick="closeTourCreate()">✕</div>
+    <div class="sec-title" style="margin-bottom:10px">🏆 Create Tournament</div>
+    <label class="label">Tournament Name</label>
+    <input class="input" id="tc-name" placeholder="My Championship" maxlength="26">
+    <label class="label mt8">Max Players</label>
+    <div class="mode-grid mg2 mt8">
+      <button class="mdbtn on" onclick="selOpt('tc','4',this)">4 Players</button>
+      <button class="mdbtn" onclick="selOpt('tc','8',this)">8 Players</button>
+    </div>
+    <label class="label mt8">Prize Points</label>
+    <div class="mode-grid mg3 mt8">
+      <button class="mdbtn" onclick="selOpt('tprize','500',this)">500</button>
+      <button class="mdbtn on" onclick="selOpt('tprize','1000',this)">1000</button>
+      <button class="mdbtn" onclick="selOpt('tprize','2000',this)">2000</button>
+    </div>
+    <button class="btn btn-gold btn-full mt12" onclick="Tourney.create()">🚀 Create</button>
+  </div>
+</div>
+
+<!-- ════ RESULT POPUP ════ -->
+<div class="overlay" id="pop-result">
+  <div class="popup">
+    <span class="res-trophy" id="res-trophy">🏆</span>
+    <div class="res-winner" id="res-winner">RED Wins!</div>
+    <div style="text-align:center;font-size:12px;color:var(--dim);margin-top:4px" id="res-sub"></div>
+    <div class="res-stats">
+      <div class="rs"><div class="rs-n" id="rs-mv">0</div><div class="rs-l">Moves</div></div>
+      <div class="rs"><div class="rs-n" id="rs-kl">0</div><div class="rs-l">Kills</div></div>
+      <div class="rs"><div class="rs-n" id="rs-tm">0:00</div><div class="rs-l">Time</div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-gold btn-full" onclick="Room.playAgain()">🎲 Play Again</button>
+      <button class="btn btn-outline btn-full" onclick="Room.exitToHome()">🏠 Home</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     JAVASCRIPT  –  Full Game Logic
+════════════════════════════════════════ -->
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════
+   ██████╗  ██████╗  ███╗   ██╗███████╗██╗ ██████╗
+   ██╔════╝ ██╔═══██╗████╗  ██║██╔════╝██║██╔════╝
+   ██║      ██║   ██║██╔██╗ ██║█████╗  ██║██║  ███╗
+   ██║      ██║   ██║██║╚██╗██║██╔══╝  ██║██║   ██║
+   ╚██████╗ ╚██████╔╝██║ ╚████║██║     ██║╚██████╔╝
+    ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚═╝     ╚═╝ ╚═════╝
+   TOM X 016 – Firebase Realtime Multiplayer Ludo
+   ═══════════════════════════════════════════════════════════
+   ARCHITECTURE:
+   • Firebase Realtime Database = single source of truth
+   • Only the current player writes game state
+   • All players read/react to Firebase changes
+   • Telegram WebApp SDK for user identity
+   • Disconnect handled by Firebase onDisconnect()
+   ═══════════════════════════════════════════════════════════ */
+
+<!-- ════════════════════════════════════════
+     JAVASCRIPT  –  Full Game Logic
+════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ─────────────────────────────────────────
+// 🔥 FIREBASE CONFIG - UPDATED WITH REAL DATA
+// ─────────────────────────────────────────
+const FB_CONFIG = {
+  apiKey: "AIzaSyBSxOefW7eIfl9ih0OBfdHgHv0A4gbVMfA",
+  authDomain: "tomx016.firebaseapp.com",
+  databaseURL: "https://tomx016-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "tomx016",
+  storageBucket: "tomx016.firebasestorage.app",
+  messagingSenderId: "275863059765",
+  appId: "1:275863059765:web:e06671942e5c85368b607c",
+  measurementId: "G-X4E87DR5P3"
+};
+
+// ─────────────────────────────────────────
+// 🤖 TELEGRAM BOT API KEY
+// ─────────────────────────────────────────
+const TG_BOT_API_KEY = "8699540173:AAEPW5Sf3ndXF3SnKkm4q6DjmTmir-s1aVQ";
+const BOT_USERNAME = 'tomx016bot'; 
+// ─────────────────────────────────────────
+
+/* ═══════════════════════════════════════
+   LUDO BOARD CONSTANTS
+═══════════════════════════════════════ */
+// ... (Rest of the Ludo path and board logic remains the same)
+// ─────────────────────────────────────────
+
+/* ═══════════════════════════════════════
+   LUDO BOARD CONSTANTS
+═══════════════════════════════════════ */
+// 52-cell outer path [row, col] on a 15×15 grid
+// Standard Ludo path, clockwise from RED entry at (6,1)
+const PATH = (() => {
+  const p = [];
+  // RED side → right (row 6, col 1→5)
+  for (let c = 1; c <= 5; c++) p.push([6, c]);
+  // Up (col 6, row 5→0)
+  for (let r = 5; r >= 0; r--) p.push([r, 6]);
+  // Top-mid
+  p.push([0, 7]);
+  // Down right side (col 8, row 0→5)
+  for (let r = 0; r <= 5; r++) p.push([r, 8]);
+  // GREEN side → right (row 6, col 9→13)
+  for (let c = 9; c <= 13; c++) p.push([6, c]);
+  // Right-mid
+  p.push([7, 13]);
+  // BLUE side ← left (row 8, col 13→9)
+  for (let c = 13; c >= 9; c--) p.push([8, c]);
+  // Down (col 8, row 9→13)   ← right outer column
+  for (let r = 9; r <= 13; r++) p.push([r, 8]);
+  // Bottom-mid
+  p.push([14, 7]);
+  // Up left bottom (row 14 → row 9, col 6)
+  for (let r = 14; r >= 9; r--) p.push([r, 6]);
+  // YELLOW side ← left (row 8, col 5→1)
+  for (let c = 5; c >= 1; c--) p.push([8, c]);
+  // Left-mid
+  p.push([7, 1]);
+  return p; // 52 cells
+})();
+
+// Home stretches: 6 cells from side-entry to centre
+// Token pos 52→56 maps to HOME[color][pos-52]
+const HOME = {
+  red:    [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],   // col 7 upward
+  green:  [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],        // col 7 downward
+  blue:   [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],    // row 7 leftward
+  yellow: [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],        // row 7 rightward
+};
+
+// Entry index on PATH for each colour
+const ENTRY = { red: 0, green: 13, blue: 26, yellow: 39 };
+
+// Yard slot [row, col] for each of 4 tokens inside home quadrant
+const YARD = {
+  red:    [[1.5,1.5],[1.5,3.5],[3.5,1.5],[3.5,3.5]],
+  green:  [[1.5,10.5],[1.5,12.5],[3.5,10.5],[3.5,12.5]],
+  blue:   [[10.5,1.5],[10.5,3.5],[12.5,1.5],[12.5,3.5]],
+  yellow: [[10.5,10.5],[10.5,12.5],[12.5,10.5],[12.5,12.5]],
+};
+
+// Safe cells by PATH index (stars) – cannot be killed here
+const SAFE_IDX = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+
+// Colour visual values
+const CL = {
+  red:    { h:'#ef4444', l:'#fca5a5', bg:'#fee2e2' },
+  green:  { h:'#22c55e', l:'#86efac', bg:'#dcfce7' },
+  blue:   { h:'#3b82f6', l:'#93c5fd', bg:'#dbeafe' },
+  yellow: { h:'#eab308', l:'#fde047', bg:'#fef9c3' },
+};
+const COLOR_ORDER = ['red','green','blue','yellow'];
+
+/*
+  TOKEN POSITION ENCODING:
+    -1      → yard (not yet on board)
+    0–51    → main path (absolute path index = (ENTRY[color] + pos) % 52)
+    52–56   → home stretch (HOME[color][pos - 52])
+    57      → finished / done
+*/
+
+/* ═══════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const rnd = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+const genCode = () => {
+  const s = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length:6}, () => s[rnd(0, s.length-1)]).join('');
+};
+const deepClone = obj => JSON.parse(JSON.stringify(obj));
+
+function toast(msg, dur=2700) {
+  const w = $('toasts'), t = document.createElement('div');
+  t.className = 'toast-msg'; t.textContent = msg; w.appendChild(t);
+  setTimeout(() => t.remove(), dur + 280);
+}
+function confetti() {
+  const w = $('confetti');
+  ['#fbbf24','#ec4899','#7c3aed','#22c55e','#3b82f6','#ef4444','#06b6d4'].forEach(col => {
+    for (let i = 0; i < 9; i++) {
+      const p = document.createElement('div'); p.className = 'conf';
+      const sz = rnd(7,13);
+      p.style.cssText = `left:${rnd(3,97)}vw;background:${col};width:${sz}px;height:${sz}px;
+        border-radius:${Math.random()>.5?'50%':'2px'};
+        animation-duration:${rnd(20,40)/10}s;animation-delay:${rnd(0,25)/10}s`;
+      w.appendChild(p);
+    }
+  });
+  setTimeout(() => w.innerHTML = '', 7000);
+}
+function showFloat(em) {
+  const d = document.createElement('div'); d.className = 'float-em'; d.textContent = em;
+  d.style.left = rnd(20,75)+'vw'; d.style.bottom = '100px';
+  document.body.appendChild(d); setTimeout(() => d.remove(), 2300);
+}
+function copyCode() {
+  const code = $('lcode').textContent.trim();
+  navigator.clipboard?.writeText(code).catch(() => {});
+  toast('📋 Copied: ' + code);
+}
+
+/* ═══════════════════════════════════════
+   SCREEN NAVIGATION
+═══════════════════════════════════════ */
+let _curScreen = 's-loading';
+const NAV_SCREENS = ['s-home','s-lb','s-tourney'];
+function goTo(id) {
+  $(_curScreen)?.classList.remove('active');
+  $(id)?.classList.add('active');
+  _curScreen = id;
+  $('bnav').style.display = NAV_SCREENS.includes(id) ? 'flex' : 'none';
+}
+function navTo(id, navId) {
+  goTo(id);
+  document.querySelectorAll('.bni').forEach(n => n.classList.remove('active'));
+  $('bni-'+navId)?.classList.add('active');
+}
+
+/* ═══════════════════════════════════════
+   SETTINGS (local UI state)
+═══════════════════════════════════════ */
+const SET = { players:'2', timer:'30', tc:'4', tprize:'1000' };
+function selOpt(key, val, btn) {
+  SET[key] = val;
+  btn.parentElement.querySelectorAll('.mdbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+}
+
+/* ═══════════════════════════════════════
+   PROFILE (localStorage)
+═══════════════════════════════════════ */
+const AVATARS = ['😎','🎮','👑','🔥','⚡','🚀','🦁','🐉','🎯','🏆','💎','🌟','👾','🤖','🎲','🦊'];
+const PK = 'tomx016_p', SK = 'tomx016_s';
+
+const Profile = {
+  load() { try { return JSON.parse(localStorage.getItem(PK)) || {}; } catch { return {}; } },
+  save(p) { localStorage.setItem(PK, JSON.stringify(p)); },
+  stats() { try { return JSON.parse(localStorage.getItem(SK)) || {wins:0,games:0,pts:0,kills:0}; } catch { return {wins:0,games:0,pts:0,kills:0}; } },
+  saveStats(s) { localStorage.setItem(SK, JSON.stringify(s)); },
+  get() {
+    const p = this.load();
+    const tg = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    return {
+      name:   p.name   || (tg ? (tg.first_name || ('@'+tg.username) || 'Player') : 'Player'),
+      avatar: p.avatar || '😎',
+      tg:     p.tg     || (tg?.username ? '@'+tg.username : ''),
+    };
+  },
+  win(kills) {
+    const s = this.stats();
+    s.wins++; s.games++; s.pts += 500; s.kills = (s.kills||0) + (kills||0);
+    this.saveStats(s); return s;
+  },
+  lose(kills) {
+    const s = this.stats();
+    s.games++; s.pts += 50; s.kills = (s.kills||0) + (kills||0);
+    this.saveStats(s); return s;
+  },
+};
+
+let ME = { uid: null, name: 'Player', avatar: '😎', tg: '' };
+
+/* ═══════════════════════════════════════
+   PROFILE UI
+═══════════════════════════════════════ */
+function openProfile() {
+  const p = Profile.get(), s = Profile.stats();
+  $('pav-big').textContent = p.avatar;
+  $('pp-name').value = p.name;
+  $('pp-tg').value = p.tg || '';
+  $('pp-wins').textContent = s.wins;
+  $('pp-games').textContent = s.games;
+  $('pp-pts').textContent = s.pts;
+  const pk = $('epicker');
+  pk.innerHTML = AVATARS.map(e =>
+    `<div class="ep-opt${e===p.avatar?' sel':''}" onclick="pickAv('${e}',this)">${e}</div>`
+  ).join('');
+  $('pop-profile').classList.add('open');
+}
+function closeProfile() { $('pop-profile').classList.remove('open'); $('ep-wrap').style.display='none'; }
+function toggleEP() { const w=$('ep-wrap'); w.style.display = w.style.display==='none'?'block':'none'; }
+function pickAv(e, el) {
+  $('pav-big').textContent = e;
+  document.querySelectorAll('.ep-opt').forEach(x => x.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function saveProfile() {
+  const name = $('pp-name').value.trim() || 'Player';
+  const avatar = $('pav-big').textContent;
+  const tg = $('pp-tg').value.trim();
+  Profile.save({ name, avatar, tg });
+  ME.name = name; ME.avatar = avatar; ME.tg = tg;
+  $('hav').textContent = avatar; $('hname').textContent = name;
+  closeProfile(); toast('✅ Profile saved!');
+}
+
+/* ═══════════════════════════════════════
+   FIREBASE MANAGER
+═══════════════════════════════════════ */
+let db = null;
+let fbReady = false;
+
+function initFirebase() {
+  try {
+    firebase.initializeApp(FB_CONFIG);
+    db = firebase.database();
+    // Test connectivity
+    db.ref('.info/connected').on('value', snap => {
+      fbReady = snap.val() === true;
+      const dot = $('sdot'), lbl = $('fb-status');
+      if (dot) { dot.className = 'sdot ' + (fbReady ? 'on' : 'off'); }
+      if (lbl) { lbl.textContent = fbReady ? 'Connected' : 'Reconnecting…'; lbl.style.color = fbReady ? 'var(--grn)' : 'var(--red)'; }
+    });
+    return true;
+  } catch(e) {
+    console.error('Firebase init failed:', e);
+    return false;
+  }
+}
+
+// Short-hand database refs
+const ref  = path => db.ref(path);
+const roomRef  = code => db.ref(`rooms/${code}`);
+const stateRef = code => db.ref(`rooms/${code}/state`);
+const playRef  = code => db.ref(`rooms/${code}/players`);
+const chatRef  = code => db.ref(`rooms/${code}/chat`);
+const lbRef    = () => db.ref('leaderboard');
+
+/* ═══════════════════════════════════════
+   ROOM MANAGER
+═══════════════════════════════════════ */
+const ROOM = {
+  code: '',
+  data: null,      // full room snapshot { players, state, settings }
+  myColor: null,
+  isHost: false,
+  listeners: [],   // Firebase listeners to detach on leave
+
+  // Attach a Firebase listener and track it
+  on(fbRef, event, cb) {
+    fbRef.on(event, cb);
+    this.listeners.push({ ref: fbRef, event, cb });
+  },
+
+  // Detach all Firebase listeners
+  offAll() {
+    this.listeners.forEach(({ ref, event, cb }) => ref.off(event, cb));
+    this.listeners = [];
+  },
+
+  // Current player's color
+  myC() { return this.myColor; },
+
+  // Is it currently my turn?
+  isMyTurn(state) {
+    return state && state.currentColor === this.myC() && !state.gameOver;
+  },
+};
+
+/* ─────────────────────────────────────────
+   CREATE ROOM
+───────────────────────────────────────── */
+const Room = {
+  async create() {
+    if (!fbReady) { toast('❌ Not connected to Firebase!'); return; }
+    const name = $('cr-name').value.trim() || 'My Room';
+    const maxPlayers = parseInt(SET.players) || 2;
+    const timer = parseInt(SET.timer) || 30;
+    const code = genCode();
+
+    ROOM.code = code;
+    ROOM.isHost = true;
+    ROOM.myColor = 'red'; // Host is always RED
+
+    const roomData = {
+      name,
+      code,
+      maxPlayers,
+      timer,
+      createdAt: Date.now(),
+      status: 'lobby',    // 'lobby' | 'playing' | 'done'
+      players: {
+        [ME.uid]: { name: ME.name, avatar: ME.avatar, color: 'red', uid: ME.uid, joinedAt: Date.now() }
+      },
+      state: null,
+    };
+
+    try {
+      await roomRef(code).set(roomData);
+      // Auto-remove room after 4 hours (cleanup)
+      roomRef(code).onDisconnect().remove();
+      // Remove THIS player on disconnect
+      playRef(code).child(ME.uid).onDisconnect().remove();
+      toast('✅ Room created! Code: ' + code);
+      navigator.clipboard?.writeText(code).catch(() => {});
+      $('lcode').textContent = code;
+      $('lobby-title').textContent = name;
+      goTo('s-lobby');
+      Room._listenLobby();
+    } catch(e) {
+      toast('❌ Error: ' + e.message);
+    }
+  },
+
+  /* ─── JOIN ROOM ─── */
+  async join() {
+    if (!fbReady) { toast('❌ Not connected to Firebase!'); return; }
+    const code = $('join-code').value.trim().toUpperCase();
+    if (code.length < 4) { toast('❌ Enter a valid code!'); return; }
+    toast('🔗 Joining…');
+
+    try {
+      const snap = await roomRef(code).once('value');
+      const data = snap.val();
+      if (!data) { toast('❌ Room not found!'); return; }
+      if (data.status !== 'lobby') { toast('❌ Game already started!'); return; }
+      const players = data.players || {};
+      const count = Object.keys(players).length;
+      if (count >= data.maxPlayers) { toast('❌ Room is full!'); return; }
+      if (players[ME.uid]) { toast('Already in this room!'); }
+
+      // Assign colour
+      const used = Object.values(players).map(p => p.color);
+      const color = COLOR_ORDER.find(c => !used.includes(c)) || 'red';
+
+      ROOM.code = code;
+      ROOM.isHost = false;
+      ROOM.myColor = color;
+
+      await playRef(code).child(ME.uid).set({
+        name: ME.name, avatar: ME.avatar, color, uid: ME.uid, joinedAt: Date.now()
+      });
+      playRef(code).child(ME.uid).onDisconnect().remove();
+
+      $('lcode').textContent = code;
+      $('lobby-title').textContent = data.name;
+      $('lob-max').textContent = data.maxPlayers;
+      $('lob-timer').textContent = data.timer ? data.timer+'s' : 'Off';
+      goTo('s-lobby');
+      Room._listenLobby();
+      toast('✅ Joined room: ' + code);
+    } catch(e) {
+      toast('❌ ' + e.message);
+    }
+  },
+
+  /* ─── LOBBY LISTENER ─── */
+  _listenLobby() {
+    const code = ROOM.code;
+    // Listen for player changes
+    ROOM.on(playRef(code), 'value', snap => {
+      const players = snap.val() || {};
+      ROOM.data = ROOM.data || {};
+      ROOM.data.players = players;
+      renderLobby(players);
+    });
+    // Listen for game start
+    ROOM.on(stateRef(code), 'value', snap => {
+      const state = snap.val();
+      if (state && _curScreen === 's-lobby') {
+        Game.startFromFirebase(state);
+      }
+    });
+    // Listen for room status
+    ROOM.on(roomRef(code).child('status'), 'value', snap => {
+      if (snap.val() === 'done' && _curScreen !== 's-home') {
+        // Room closed
+      }
+    });
+  },
+
+  /* ─── START GAME (host only) ─── */
+  async startGame() {
+    if (!ROOM.isHost) return;
+    const snap = await playRef(ROOM.code).once('value');
+    const players = snap.val() || {};
+    const pList = Object.values(players).sort((a,b) => a.joinedAt - b.joinedAt);
+    if (pList.length < 2) { toast('Need at least 2 players!'); return; }
+
+    // Build initial game state
+    const state = Game.buildState(pList, ROOM.code);
+
+    // Write to Firebase → all players will react
+    await stateRef(ROOM.code).set(state);
+    await roomRef(ROOM.code).child('status').set('playing');
+    toast('🎮 Game started!');
+  },
+
+  /* ─── LISTEN GAME (all players) ─── */
+  listenGame() {
+    const code = ROOM.code;
+    // Game state listener – this is the core sync mechanism
+    ROOM.on(stateRef(code), 'value', snap => {
+      const state = snap.val();
+      if (!state) return;
+      Game.applyState(state);
+    });
+    // Chat listener
+    ROOM.on(chatRef(code), 'child_added', snap => {
+      const d = snap.val();
+      if (d) addChatLine(d.name, d.msg, d.color);
+    });
+    // Player leave listener
+    ROOM.on(playRef(code), 'value', snap => {
+      const players = snap.val() || {};
+      // Update panels if in game
+      if (Game.state) {
+        Game.state.players = Object.values(players);
+        Game.renderPanels();
+      }
+    });
+  },
+
+  /* ─── LEAVE ─── */
+  async leave() {
+    ROOM.offAll();
+    if (ROOM.code && ME.uid) {
+      await playRef(ROOM.code).child(ME.uid).remove().catch(() => {});
+    }
+    ROOM.code = ''; ROOM.myColor = null; ROOM.isHost = false; ROOM.data = null;
+    Game.state = null; Game.stopTimers();
+    goTo('s-home');
+  },
+
+  /* ─── QUIT MID-GAME ─── */
+  quit() {
+    if (confirm('Leave the game?')) this.leave();
+  },
+
+  /* ─── PLAY AGAIN (host restarts) ─── */
+  async playAgain() {
+    $('pop-result').classList.remove('open');
+    if (ROOM.isHost) {
+      // Reset state to lobby
+      await stateRef(ROOM.code).set(null);
+      await roomRef(ROOM.code).child('status').set('lobby');
+      goTo('s-lobby');
+    } else {
+      toast('Waiting for host to restart…');
+      goTo('s-lobby');
+    }
+  },
+
+  /* ─── EXIT TO HOME ─── */
+  exitToHome() {
+    $('pop-result').classList.remove('open');
+    this.leave();
+  },
+
+  /* ─── SHARE VIA TELEGRAM ─── */
+  shareTG() {
+    const code = ROOM.code || $('lcode').textContent.trim();
+    const txt = `🎲 Join my Ludo game!\nRoom code: ${code}\n\nTap to play: https://t.me/${BOT_USERNAME}?startapp=${code}`;
+    const url = `https://t.me/share/url?url=${encodeURIComponent('https://t.me/'+BOT_USERNAME)}&text=${encodeURIComponent(txt)}`;
+    if (window.Telegram?.WebApp) {
+      window.Telegram.WebApp.openTelegramLink(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  }
+};
+
+/* ─────────────────────────────────────────
+   LOBBY RENDERER
+───────────────────────────────────────── */
+function renderLobby(players) {
+  const snap = roomRef(ROOM.code);
+  snap.once('value').then(s => {
+    const roomData = s.val() || {};
+    const maxP = roomData.maxPlayers || 2;
+    $('lob-max').textContent = maxP;
+    $('lob-timer').textContent = roomData.timer ? roomData.timer+'s' : 'Off';
+
+    const pList = Object.values(players).sort((a,b) => a.joinedAt - b.joinedAt);
+    let html = '';
+    for (let i = 0; i < maxP; i++) {
+      const p = pList[i];
+      if (p) {
+        const isMe = p.uid === ME.uid;
+        html += `<div class="lp-slot">
+          <div class="lp-dot" style="background:${CL[p.color]?.h||'#888'}"></div>
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#ec4899);
+            display:flex;align-items:center;justify-content:center;font-size:15px">${p.avatar||'😎'}</div>
+          <div style="flex:1">
+            <div class="lp-name">${p.name}${isMe?' (You)':''}</div>
+            <div class="lp-sub">${p.color.toUpperCase()}${ROOM.isHost&&isMe?' · Host':''}</div>
+          </div>
+          <span class="badge badge-g">✓ Ready</span>
+        </div>`;
+      } else {
+        html += `<div class="lp-slot empty"><span style="color:var(--dimmer);font-size:12px">⏳ Slot ${i+1} – Waiting…</span></div>`;
+      }
+    }
+    $('lobby-players').innerHTML = html;
+
+    const canStart = ROOM.isHost && pList.length >= 2;
+    $('start-btn').style.display = canStart ? 'flex' : 'none';
+    $('wait-msg').style.display = ROOM.isHost ? 'none' : 'block';
+  });
+}
+
+/* ═══════════════════════════════════════
+   GAME ENGINE
+   Firebase is single source of truth.
+   Only current player writes state.
+   All players receive via listener.
+═══════════════════════════════════════ */
+const Game = {
+  state: null,
+  canvas: null,
+  ctx: null,
+  sz: 0,
+  timerInt: null,
+
+  /* ─── Build initial game state ─── */
+  buildState(playerList, roomCode) {
+    const tokens = {};
+    playerList.forEach(p => {
+      tokens[p.color] = [0,1,2,3].map(i => ({ id: i, color: p.color, pos: -1 }));
+    });
+    return {
+      roomCode,
+      players: playerList,  // [{uid,name,avatar,color}]
+      tokens,
+      curIdx: 0,
+      currentColor: playerList[0].color,
+      currentUID: playerList[0].uid,
+      dice: 0,
+      rolled: false,
+      gameOver: false,
+      score:  Object.fromEntries(playerList.map(p => [p.color, 0])),
+      kills:  Object.fromEntries(playerList.map(p => [p.color, 0])),
+      moves:  Object.fromEntries(playerList.map(p => [p.color, 0])),
+      t0: Date.now(),
+      timer: playerList[0]?.timer || 30,
+      tLeft: 30,
+    };
+  },
+
+  /* ─── Called when Firebase state arrives (all players) ─── */
+  applyState(state) {
+    const wasInGame = _curScreen === 's-game';
+    this.state = deepClone(state);
+    // Make sure game screen is shown
+    if (_curScreen !== 's-game') {
+      goTo('s-game');
+      this._initCanvas();
+      Room.listenGame();
+    }
+    this._renderDice(state.dice || 0);
+    this._updateTurnUI();
+    this.renderPanels();
+    this._draw();
+    // Timer: only current player drives the countdown
+    this._resetTimerDisplay();
+    // Show result if game over
+    if (state.gameOver && state.winner) {
+      setTimeout(() => this._showResult(state.winner), 400);
+    }
+  },
+
+  /* ─── Called on host when game is being launched ─── */
+  startFromFirebase(state) {
+    this.applyState(state);
+    if (_curScreen !== 's-game') {
+      goTo('s-game');
+      this._initCanvas();
+      Room.listenGame();
+    }
+  },
+
+  /* ─── Canvas setup ─── */
+  _initCanvas() {
+    this.canvas = $('board');
+    this.ctx = this.canvas.getContext('2d');
+    this._resize();
+    window.addEventListener('resize', () => this._resize());
+    this.canvas.addEventListener('click', e => this._canvasClick(e));
+    this.canvas.addEventListener('touchend', e => { e.preventDefault(); this._canvasClick(e.changedTouches[0]); }, { passive: false });
+  },
+
+  _resize() {
+    if (!this.canvas) return;
+    const area = this.canvas.parentElement;
+    const s = Math.min(area.clientWidth - 6, area.clientHeight - 6, 420);
+    this.canvas.width = s; this.canvas.height = s; this.sz = s;
+    this._draw();
+  },
+
+  _cs() { return this.sz / 15; },
+
+  /* ─────────────────────────────────────────
+     DICE ROLL (only current player can roll)
+  ───────────────────────────────────────── */
+  rollDice() {
+    if (!this.state || this.state.gameOver) return;
+    if (!ROOM.isMyTurn(this.state)) { toast('⏳ Not your turn!'); return; }
+    if (this.state.rolled) { toast('Already rolled! Tap a token to move.'); return; }
+    this._doRoll();
+  },
+
+  _doRoll() {
+    const dEl = $('dice-el');
+    if (dEl) { dEl.classList.add('roll'); setTimeout(() => dEl.classList.remove('roll'), 450); }
+    // Sound
+    Sound.dice();
+    // Animate
+    let t = 0;
+    const iv = setInterval(() => {
+      this._renderDice(rnd(1,6)); t++;
+      if (t >= 7) {
+        clearInterval(iv);
+        const val = rnd(1, 6);
+        // Write rolled state to Firebase
+        // (prevents double-roll: rolled=true immediately)
+        const newState = deepClone(this.state);
+        newState.dice = val;
+        newState.rolled = true;
+        this._writeState(newState, `🎲 ${newState.currentColor.toUpperCase()} rolled ${val}`);
+      }
+    }, 65);
+  },
+
+  /* ─────────────────────────────────────────
+     MOVABLE TOKENS
+  ───────────────────────────────────────── */
+  _movable(state) {
+    if (!state || !state.rolled) return new Set();
+    const color = state.currentColor, d = state.dice;
+    const s = new Set();
+    (state.tokens[color] || []).forEach(tok => {
+      if (tok.pos === 57) return;
+      if (tok.pos === -1) { if (d === 6) s.add(color+':'+tok.id); return; }
+      if (tok.pos >= 52) { if ((tok.pos - 52) + d <= 5) s.add(color+':'+tok.id); return; }
+      // Main path: allowed if won't overshoot home area
+      // A token at pos p needs to check if p+d goes past 51 correctly
+      const newPos = tok.pos + d;
+      if (newPos <= 56) s.add(color+':'+tok.id);
+    });
+    return s;
+  },
+
+  /* ─────────────────────────────────────────
+     MOVE TOKEN (only current player)
+  ───────────────────────────────────────── */
+  moveTok(color, id) {
+    if (!this.state || this.state.gameOver) return;
+    if (!ROOM.isMyTurn(this.state)) { toast('⏳ Not your turn!'); return; }
+    if (!this.state.rolled) { toast('🎲 Roll first!'); return; }
+    const mv = this._movable(this.state);
+    if (!mv.has(color+':'+id)) { toast('❌ Cannot move that token!'); return; }
+
+    const ns = deepClone(this.state);
+    const tok = ns.tokens[color].find(t => t.id === id);
+    const d = ns.dice;
+
+    // Apply move
+    let msg = '';
+    if (tok.pos === -1 && d === 6) {
+      tok.pos = 0;
+      msg = `${color.toUpperCase()} token #${id+1} entered the board! 🎉`;
+    } else if (tok.pos >= 52) {
+      tok.pos = Math.min(tok.pos + d, 57);
+      if (tok.pos >= 57) { tok.pos = 57; msg = `${color.toUpperCase()} token #${id+1} reached HOME! ⭐`; }
+    } else {
+      tok.pos += d;
+      if (tok.pos < 52) {
+        const kill = this._checkKill(ns, tok, color);
+        if (kill) msg = `💀 ${color.toUpperCase()} killed ${kill.toUpperCase()}!`;
+      }
+      if (!msg) msg = `${color.toUpperCase()} moved token #${id+1}`;
+    }
+
+    // Score
+    const homeToks = ns.tokens[color].filter(t => t.pos === 57).length;
+    ns.score[color] = homeToks;
+    ns.moves[color] = (ns.moves[color] || 0) + 1;
+
+    // Check win
+    if (homeToks >= 4) {
+      ns.gameOver = true;
+      ns.winner = color;
+      this._writeState(ns, `🏆 ${ns.players.find(p=>p.color===color)?.name||color.toUpperCase()} WINS!`);
+      return;
+    }
+
+    // Bonus roll on 6
+    if (d === 6) {
+      ns.rolled = false; ns.dice = 0;
+      this._writeState(ns, msg + ` | Bonus roll!`);
+    } else {
+      this._nextTurn(ns);
+      this._writeState(ns, msg);
+    }
+  },
+
+  _checkKill(ns, movedTok, color) {
+    const myAbsIdx = (ENTRY[color] + movedTok.pos) % 52;
+    if (SAFE_IDX.has(myAbsIdx)) return null;
+    let killed = null;
+    ns.players.forEach(p => {
+      if (p.color === color) return;
+      (ns.tokens[p.color] || []).forEach(t => {
+        if (t.pos < 0 || t.pos >= 52 || t.pos === 57) return;
+        const opAbsIdx = (ENTRY[p.color] + t.pos) % 52;
+        if (opAbsIdx === myAbsIdx) {
+          t.pos = -1; // send to yard
+          ns.kills[color] = (ns.kills[color] || 0) + 1;
+          killed = p.color;
+        }
+      });
+    });
+    return killed;
+  },
+
+  _nextTurn(ns) {
+    const colors = ns.players.map(p => p.color);
+    ns.curIdx = (ns.curIdx + 1) % colors.length;
+    ns.currentColor = colors[ns.curIdx];
+    ns.currentUID = ns.players[ns.curIdx].uid;
+    ns.rolled = false; ns.dice = 0;
+    ns.tLeft = ns.timer || 30;
+  },
+
+  /* ─── Write state to Firebase ─── */
+  _writeState(ns, logMsg) {
+    if (!ROOM.code) return;
+    // Write to Firebase – all players will receive via listener
+    stateRef(ROOM.code).set(ns).catch(e => toast('Sync error: ' + e.message));
+    // Log chat
+    if (logMsg) {
+      chatRef(ROOM.code).push({ name: 'Game', msg: logMsg, color: '#888', ts: Date.now() });
+    }
+  },
+
+  /* ─────────────────────────────────────────
+     BOARD DRAWING (Canvas)
+  ───────────────────────────────────────── */
+  _draw() {
+    const c = this.ctx, S = this.sz;
+    if (!c || !S) return;
+    const cell = this._cs();
+    c.clearRect(0, 0, S, S);
+
+    // Background
+    c.fillStyle = '#ede8ff';
+    this._rr(c, 0, 0, S, S, 10); c.fill();
+
+    // Grid lines
+    c.strokeStyle = 'rgba(0,0,0,0.05)'; c.lineWidth = 0.4;
+    for (let i = 0; i <= 15; i++) {
+      c.beginPath(); c.moveTo(i*cell, 0); c.lineTo(i*cell, S); c.stroke();
+      c.beginPath(); c.moveTo(0, i*cell); c.lineTo(S, i*cell); c.stroke();
+    }
+
+    this._drawYards(c, cell);
+    this._drawPath(c, cell);
+    this._drawHomeLanes(c, cell);
+    this._drawCenter(c, cell, S);
+    this._drawTokens(c, cell);
+  },
+
+  _rr(c, x, y, w, h, r) {
+    c.beginPath(); c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.arcTo(x+w,y,x+w,y+r,r);
+    c.lineTo(x+w,y+h-r); c.arcTo(x+w,y+h,x+w-r,y+h,r);
+    c.lineTo(x+r,y+h); c.arcTo(x,y+h,x,y+h-r,r);
+    c.lineTo(x,y+r); c.arcTo(x,y,x+r,y,r); c.closePath();
+  },
+
+  _drawYards(c, cell) {
+    [
+      { color:'red',    row:0, col:0  },
+      { color:'green',  row:0, col:9  },
+      { color:'blue',   row:9, col:0  },
+      { color:'yellow', row:9, col:9  },
+    ].forEach(({ color, row, col }) => {
+      const x = col*cell, y = row*cell, w = 6*cell;
+      this._rr(c, x+1, y+1, w-2, w-2, 9);
+      c.fillStyle = CL[color].bg; c.fill();
+      c.strokeStyle = CL[color].h; c.lineWidth = 2; c.stroke();
+      // Inner white area
+      const m = cell * 0.8;
+      this._rr(c, x+m, y+m, w-2*m, w-2*m, 7);
+      c.fillStyle = 'rgba(255,255,255,0.68)'; c.fill();
+      // 4 yard slots
+      YARD[color].forEach(([r, co]) => {
+        c.beginPath(); c.arc(co*cell, r*cell, cell*0.37, 0, Math.PI*2);
+        c.fillStyle = CL[color].h + '44'; c.fill();
+        c.strokeStyle = CL[color].h; c.lineWidth = 1.5; c.stroke();
+      });
+      // Label
+      c.font = `bold ${cell*0.38}px sans-serif`;
+      c.fillStyle = CL[color].h; c.textAlign = 'left'; c.textBaseline = 'top';
+      c.globalAlpha = 0.7;
+      c.fillText(color.toUpperCase(), x + cell*0.15, y + cell*0.1);
+      c.globalAlpha = 1;
+    });
+  },
+
+  _drawPath(c, cell) {
+    PATH.forEach(([r, co], i) => {
+      const x = co*cell, y = r*cell;
+      c.fillStyle = 'rgba(255,255,255,0.75)';
+      c.fillRect(x+0.5, y+0.5, cell-1, cell-1);
+      c.strokeStyle = 'rgba(0,0,0,0.07)'; c.lineWidth = 0.5;
+      c.strokeRect(x+0.5, y+0.5, cell-1, cell-1);
+      // Colour entry cells
+      const entryCol = { 0:'red', 13:'green', 26:'blue', 39:'yellow' };
+      if (entryCol[i]) {
+        c.fillStyle = CL[entryCol[i]].h + '99';
+        c.fillRect(x+1, y+1, cell-2, cell-2);
+      }
+      // Safe cells
+      if (SAFE_IDX.has(i)) {
+        c.font = `${cell*0.55}px serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.globalAlpha = 0.55; c.fillStyle = '#7c3aed';
+        c.fillText('★', (co+0.5)*cell, (r+0.5)*cell);
+        c.globalAlpha = 1;
+      }
+    });
+  },
+
+  _drawHomeLanes(c, cell) {
+    Object.entries(HOME).forEach(([color, cells]) => {
+      cells.slice(0, 5).forEach(([r, co], i) => {
+        c.fillStyle = CL[color].h;
+        c.globalAlpha = 0.22 + i * 0.09;
+        c.fillRect(co*cell+0.5, r*cell+0.5, cell-1, cell-1);
+        c.globalAlpha = 1;
+      });
+    });
+  },
+
+  _drawCenter(c, cell, S) {
+    const x=6*cell, y=6*cell, w=3*cell, cx2=x+w/2, cy2=y+w/2;
+    [
+      { color:'red',    pts:[[x,y],[x+w,y],[cx2,cy2]] },
+      { color:'green',  pts:[[x+w,y],[x+w,y+w],[cx2,cy2]] },
+      { color:'yellow', pts:[[x,y+w],[x+w,y+w],[cx2,cy2]] },
+      { color:'blue',   pts:[[x,y],[x,y+w],[cx2,cy2]] },
+    ].forEach(({ color, pts }) => {
+      c.beginPath(); c.moveTo(pts[0][0],pts[0][1]);
+      c.lineTo(pts[1][0],pts[1][1]); c.lineTo(pts[2][0],pts[2][1]);
+      c.closePath(); c.fillStyle = CL[color].h; c.fill();
+    });
+    this._star(c, cx2, cy2, 5, cell*0.52, cell*0.24, 'rgba(255,255,255,0.95)');
+  },
+
+  _star(c, cx2, cy2, n, outer, inner, col) {
+    c.beginPath();
+    for (let i=0; i<n*2; i++) {
+      const r = i%2===0?outer:inner, a = (i*Math.PI/n)-Math.PI/2;
+      i===0 ? c.moveTo(cx2+r*Math.cos(a),cy2+r*Math.sin(a)) : c.lineTo(cx2+r*Math.cos(a),cy2+r*Math.sin(a));
+    }
+    c.closePath(); c.fillStyle = col; c.fill();
+  },
+
+  /* ─── Token pixel position ─── */
+  _tokXY(tok) {
+    const cell = this._cs(), color = tok.color;
+    if (tok.pos === -1) {
+      const [r, co] = YARD[color][tok.id];
+      return { cx: co*cell, cy: r*cell };
+    }
+    if (tok.pos >= 57) {
+      // Finished – show near center
+      const off = [[0.1,0.1],[0.6,0.1],[0.1,0.6],[0.6,0.6]][tok.id];
+      return { cx: (6.4 + off[1]*2.1)*cell, cy: (6.4 + off[0]*2.1)*cell };
+    }
+    if (tok.pos >= 52) {
+      const hs = HOME[color], idx = Math.min(tok.pos-52, hs.length-1);
+      return { cx: (hs[idx][1]+0.5)*cell, cy: (hs[idx][0]+0.5)*cell };
+    }
+    const absIdx = (ENTRY[color] + tok.pos) % 52;
+    const [r, co] = PATH[absIdx];
+    return { cx: (co+0.5)*cell, cy: (r+0.5)*cell };
+  },
+
+  _drawTokens(c, cell) {
+    if (!this.state) return;
+    const movable = ROOM.isMyTurn(this.state) && this.state.rolled
+      ? this._movable(this.state) : new Set();
+    const offsets = [[0,0],[0.28,0],[0,0.28],[0.28,0.28]];
+
+    // Group same-position tokens for small offset
+    const grp = {};
+    Object.values(this.state.tokens).flat().forEach(tok => {
+      if (tok.pos === 57) return;
+      const k = tok.color+':'+tok.pos;
+      grp[k] = grp[k] || []; grp[k].push(tok);
+    });
+
+    Object.values(this.state.tokens).flat().forEach(tok => {
+      if (tok.pos === 57) return;
+      const { cx, cy } = this._tokXY(tok);
+      const r = cell * 0.27;
+      const key = tok.color+':'+tok.pos;
+      const gList = grp[key] || [];
+      const gi = gList.findIndex(t => t.id===tok.id && t.color===tok.color);
+      const [or, oc] = offsets[Math.max(gi,0)];
+      const px = cx + oc*cell*0.5 - (gList.length>1 ? cell*0.12 : 0);
+      const py = cy + or*cell*0.5 - (gList.length>1 ? cell*0.12 : 0);
+      const canMove = movable.has(tok.color+':'+tok.id);
+
+      if (canMove) { c.shadowColor = CL[tok.color].h; c.shadowBlur = 14; }
+
+      const grad = c.createRadialGradient(px-r*0.28, py-r*0.28, r*0.04, px, py, r);
+      grad.addColorStop(0, CL[tok.color].l); grad.addColorStop(1, CL[tok.color].h);
+      c.beginPath(); c.arc(px, py, r, 0, Math.PI*2);
+      c.fillStyle = grad; c.fill();
+      c.strokeStyle = 'rgba(255,255,255,0.65)'; c.lineWidth = 1.5; c.stroke();
+      c.shadowBlur = 0;
+
+      // Number label
+      c.font = `bold ${r*0.88}px sans-serif`;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = 'rgba(255,255,255,0.92)';
+      c.fillText(tok.id+1, px, py+r*0.05);
+
+      // Movable highlight ring
+      if (canMove) {
+        c.beginPath(); c.arc(px, py, r+3, 0, Math.PI*2);
+        c.strokeStyle = CL[tok.color].h+'dd'; c.lineWidth = 2.5; c.stroke();
+      }
+    });
+    c.shadowBlur = 0;
+  },
+
+  /* ─── Canvas click → token selection ─── */
+  _canvasClick(e) {
+    if (!this.state || this.state.gameOver) return;
+    if (!ROOM.isMyTurn(this.state)) { toast('⏳ Not your turn!'); return; }
+    if (!this.state.rolled) { toast('🎲 Roll the dice first!'); return; }
+    const mv = this._movable(this.state);
+    if (mv.size === 0) { toast('⚠️ No movable tokens!'); return; }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const sx = this.canvas.width / rect.width, sy = this.canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy;
+    const cell = this._cs();
+
+    let best = null, bestD = Infinity;
+    (this.state.tokens[this.state.currentColor] || [])
+      .filter(t => mv.has(t.color+':'+t.id))
+      .forEach(tok => {
+        const { cx, cy } = this._tokXY(tok);
+        const d = Math.hypot(x-cx, y-cy);
+        if (d < bestD) { bestD = d; best = tok; }
+      });
+
+    if (best && bestD < cell*1.3) this.moveTok(best.color, best.id);
+    else toast('Tap closer to a highlighted token!');
+  },
+
+  /* ─── DICE dots ─── */
+  _dotPatterns: {
+    0:{a:0,b:0,c:0,d:0,e:0,f:0,g:0,h:0,i:0},
+    1:{a:0,b:0,c:0,d:0,e:1,f:0,g:0,h:0,i:0},
+    2:{a:1,b:0,c:0,d:0,e:0,f:0,g:0,h:0,i:1},
+    3:{a:1,b:0,c:0,d:0,e:1,f:0,g:0,h:0,i:1},
+    4:{a:1,b:0,c:1,d:0,e:0,f:0,g:1,h:0,i:1},
+    5:{a:1,b:0,c:1,d:0,e:1,f:0,g:1,h:0,i:1},
+    6:{a:1,b:0,c:1,d:1,e:0,f:1,g:1,h:0,i:1},
+  },
+  _renderDice(val) {
+    const p = this._dotPatterns[val] || this._dotPatterns[0];
+    Object.entries(p).forEach(([k,v]) => {
+      const el = $('d'+k); if (el) el.className = 'dot'+(v?' on':'');
+    });
+    const lbl = $('dlbl');
+    if (lbl) lbl.textContent = val ? 'ROLLED: '+val : (ROOM.isMyTurn(this.state) ? 'TAP DICE' : 'WAIT…');
+  },
+
+  /* ─── Turn UI ─── */
+  _updateTurnUI() {
+    const s = this.state; if (!s) return;
+    const color = s.currentColor, hex = CL[color]?.h || '#888';
+    const pill = $('turn-badge'), dot = $('tdot'), nm = $('tname');
+    if (pill) { pill.style.background = hex+'22'; pill.style.borderColor = hex+'66'; }
+    if (dot) dot.style.background = hex;
+    const pl = s.players.find(p => p.color === color);
+    const isMe = pl && pl.uid === ME.uid;
+    if (nm) nm.textContent = (pl ? pl.name : color.toUpperCase()) + (isMe ? ' (You)' : '') + "'s Turn";
+  },
+
+  /* ─── Player panels ─── */
+  renderPanels() {
+    const s = this.state; if (!s) return;
+    const el = $('panels'); if (!el) return;
+    el.innerHTML = s.players.map(p => {
+      const active = s.currentColor === p.color;
+      const toks = s.tokens[p.color] || [];
+      const hex = CL[p.color]?.h || '#888';
+      return `<div class="panel${active?' myturn':''}" style="border-color:${hex}${active?'':'55'};color:${hex}">
+        <div class="pav">${p.avatar||'🎮'}</div>
+        <div class="pname">${p.name.slice(0,7)}</div>
+        <div class="pscore">${s.score[p.color]||0}/4</div>
+        <div class="ptoks">${toks.map(t=>`<div class="ptok${t.pos===57?' done':''}" style="background:${hex}"></div>`).join('')}</div>
+      </div>`;
+    }).join('');
+  },
+
+  /* ─── Timer display (cosmetic only – host advances turn in Firebase) ─── */
+  _resetTimerDisplay() {
+    this.stopTimers();
+    const s = this.state;
+    if (!s || !s.timer) { $('timer-val').textContent = '—'; return; }
+    let t = s.timer;
+    const el = $('timer-val');
+    if (el) { el.textContent = t; el.style.color = 'var(--gold)'; }
+    this.timerInt = setInterval(() => {
+      t--;
+      if (el) {
+        el.textContent = t;
+        el.style.color = t <= 5 ? 'var(--red)' : t <= 10 ? '#f59e0b' : 'var(--gold)';
+      }
+      if (t <= 0) {
+        this.stopTimers();
+        // Host advances turn automatically when timer expires
+        if (ROOM.isHost && ROOM.isMyTurn(this.state)) {
+          const ns = deepClone(this.state);
+          this._nextTurn(ns);
+          this._writeState(ns, '⏱️ Turn skipped (time up)');
+        }
+      }
+    }, 1000);
+  },
+
+  stopTimers() { clearInterval(this.timerInt); },
+
+  /* ─── Win / Result ─── */
+  _showResult(color) {
+    if (!this.state) return;
+    Sound.win(); confetti();
+    const pl = this.state.players.find(p => p.color === color);
+    const isMe = pl && pl.uid === ME.uid;
+    const elapsed = Math.floor((Date.now() - (this.state.t0||Date.now())) / 1000);
+    $('res-trophy').textContent = isMe ? '🏆' : '😢';
+    $('res-winner').textContent = (pl ? pl.name : color.toUpperCase()) + ' Wins!';
+    $('res-sub').textContent = isMe ? '🎉 Congratulations! +500 pts' : 'Better luck next time · +50 pts';
+    $('rs-mv').textContent = this.state.moves[color] || 0;
+    $('rs-kl').textContent = this.state.kills[color] || 0;
+    $('rs-tm').textContent = Math.floor(elapsed/60)+':'+(elapsed%60).toString().padStart(2,'0');
+    // Update local leaderboard
+    if (isMe) {
+      const s = Profile.win(this.state.kills[ROOM.myC()]||0);
+      // Push to Firebase leaderboard
+      lbRef().child(ME.uid).set({ name:ME.name,avatar:ME.avatar,pts:s.pts,wins:s.wins,kills:s.kills||0,uid:ME.uid });
+    } else {
+      Profile.lose(this.state.kills[ROOM.myC()]||0);
+    }
+    $('pop-result').classList.add('open');
+  },
+};
+
+/* ═══════════════════════════════════════
+   SOUND (dice + win only)
+═══════════════════════════════════════ */
+const Sound = (() => {
+  let ac = null;
+  const getAC = () => { if (!ac) ac = new (window.AudioContext||window.webkitAudioContext)(); return ac; };
+  const tone = (f, type, dur, vol=0.2) => {
+    try {
+      const c=getAC(), o=c.createOscillator(), g=c.createGain();
+      o.connect(g); g.connect(c.destination);
+      o.type=type; o.frequency.value=f;
+      g.gain.setValueAtTime(vol, c.currentTime+0.001);
+      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime+dur);
+      o.start(); o.stop(c.currentTime+dur+0.01);
+    } catch(e){}
+  };
+  return {
+    dice() { [260,330,400,260].forEach((f,i) => setTimeout(()=>tone(f,'square',0.05,0.12), i*50)); },
+    win()  { [523,659,784,1047,784,1047,1175].forEach((f,i) => setTimeout(()=>tone(f,'sine',0.2,0.28), i*115)); },
+  };
+})();
+
+/* ═══════════════════════════════════════
+   CHAT
+═══════════════════════════════════════ */
+function addChatLine(name, msg, color='#888') {
+  const el = $('chat-log'); if (!el) return;
+  const d = document.createElement('div'); d.className = 'chat-line';
+  d.innerHTML = `<span class="cn" style="color:${color}">${name}:</span> ${msg}`;
+  el.appendChild(d); el.scrollTop = el.scrollHeight;
+}
+function sendChat() {
+  const inp = $('chat-inp'), msg = inp.value.trim(); if (!msg) return;
+  if (!ROOM.code) { toast('Not in a room!'); return; }
+  chatRef(ROOM.code).push({ name: ME.name, msg, color: CL[ROOM.myC()]?.h||'#7c3aed', ts: Date.now() });
+  inp.value = '';
+}
+function sendReact(em) {
+  showFloat(em);
+  if (ROOM.code) chatRef(ROOM.code).push({ name: ME.name, msg: em, color: '#888', ts: Date.now() });
+}
+
+/* ═══════════════════════════════════════
+   LEADERBOARD (from Firebase)
+═══════════════════════════════════════ */
+function renderLB() {
+  lbRef().orderByChild('pts').limitToLast(20).once('value').then(snap => {
+    const all = [];
+    snap.forEach(c => all.unshift(c.val())); // highest pts first
+    // Add local user if not in Firebase yet
+    const localS = Profile.stats(), localP = Profile.get();
+    if (!all.find(x => x.uid === ME.uid) && localS.games > 0) {
+      all.push({ uid:ME.uid, name:ME.name, avatar:ME.avatar, pts:localS.pts, wins:localS.wins, kills:localS.kills||0 });
+      all.sort((a,b)=>b.pts-a.pts);
+    }
+    _renderLBData(all);
+  }).catch(() => {
+    // Offline fallback – show only local
+    const s = Profile.stats(), p = Profile.get();
+    _renderLBData([{ uid:ME.uid, name:p.name, avatar:p.avatar, pts:s.pts, wins:s.wins, kills:s.kills||0 }]);
+  });
+}
+function _renderLBData(all) {
+  const crowns = ['🥇','🥈','🥉'];
+  const pod = all.length>=3?[all[1],all[0],all[2]]:all.length===2?[all[1],all[0],null]:[null,all[0],null];
+  $('lb-top3').innerHTML = pod.map((p,i)=>{
+    const rk=i===0?2:i===1?1:3;
+    if(!p) return `<div class="lb-slot"><div class="lb-base r${rk}" style="opacity:.2">#${rk}</div><div class="lb-av r${rk}" style="opacity:.2;background:#1a0e35">—</div></div>`;
+    const isMe=p.uid===ME.uid;
+    return `<div class="lb-slot">
+      <div style="font-size:16px">${crowns[rk-1]}</div>
+      <div class="lb-av r${rk}" style="background:linear-gradient(135deg,#7c3aed,#ec4899)">${p.avatar||p.name[0]}</div>
+      <div class="lb-nm">${p.name}${isMe?' ★':''}</div>
+      <div class="lb-pts-sm">${p.pts} pts</div>
+      <div class="lb-base r${rk}">#${rk}</div>
+    </div>`;
+  }).join('');
+  $('lb-list').innerHTML = all.map((p,i)=>{
+    const isMe=p.uid===ME.uid;
+    return `<div class="lb-row${isMe?' me':''}">
+      <div class="lb-rank ${i===0?'g':i===1?'s':i===2?'b':''}">${i+1}</div>
+      <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#ec4899);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${p.avatar||'😎'}</div>
+      <div class="lb-info">
+        <div class="lb-name">${p.name}${isMe?' (You)':''}</div>
+        <div class="lb-sub">${p.wins||0} wins · ${p.kills||0} kills</div>
+      </div>
+      <div class="lb-pts">${p.pts||0}</div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;padding:24px;color:var(--dim);font-size:13px">Play some games to appear here!</div>';
+}
+
+/* ═══════════════════════════════════════
+   TOURNAMENT (Firebase-backed)
+═══════════════════════════════════════ */
+const Tourney = {
+  async create() {
+    if (!fbReady) { toast('❌ Not connected!'); return; }
+    const name = $('tc-name').value.trim() || 'My Tournament';
+    const id = genCode();
+    const t = { id, name, host:ME.name, hostUid:ME.uid, maxP:parseInt(SET.tc||4),
+                prize:parseInt(SET.tprize||1000), players:{[ME.uid]:ME.name}, ts:Date.now() };
+    await db.ref(`tournaments/${id}`).set(t);
+    closeTourCreate(); toast('🏆 Tournament #'+id+' created!');
+    Tourney.load();
+  },
+  load() {
+    db.ref('tournaments').orderByChild('ts').limitToLast(10).once('value').then(snap=>{
+      const list = [];
+      snap.forEach(c => list.unshift(c.val()));
+      const el = $('tour-list');
+      if (!list.length) { el.innerHTML='<div style="text-align:center;color:var(--dim);padding:32px;font-size:13px">No tournaments.<br>Tap <b>+ Create</b>!</div>'; return; }
+      el.innerHTML = list.map(t=>`
+        <div class="tc" onclick="Tourney.join('${t.id}')">
+          <div class="tc-hdr"><div class="tc-t">🏆 ${t.name}</div><span class="badge badge-p">${Object.keys(t.players||{}).length}/${t.maxP}</span></div>
+          <div class="tc-body"><span>Host: <b style="color:var(--txt)">${t.host}</b></span><span style="margin-left:auto">Prize: <b style="color:var(--gold)">${t.prize} pts</b></span></div>
+          <div class="tc-ps">${Object.values(t.players||{}).map(n=>`<span class="badge badge-g">${n}</span>`).join('')}</div>
+        </div>`).join('');
+    });
+  },
+  async join(id) {
+    if (!fbReady) { toast('❌ Not connected!'); return; }
+    const snap = await db.ref(`tournaments/${id}`).once('value');
+    const t = snap.val(); if (!t) { toast('Not found!'); return; }
+    if (Object.keys(t.players||{}).length >= t.maxP) { toast('Full!'); return; }
+    await db.ref(`tournaments/${id}/players/${ME.uid}`).set(ME.name);
+    Tourney.load(); toast('✅ Joined: '+t.name);
+  }
+};
+function openTourCreate() { $('pop-tour').classList.add('open'); Tourney.load(); }
+function closeTourCreate() { $('pop-tour').classList.remove('open'); }
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+
+  /* ── 1. Telegram WebApp setup ── */
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    try { tg.disableVerticalSwipes(); } catch(e){}
+    // MainButton
+    try {
+      tg.MainButton.setText('🎮 Create Room');
+      tg.MainButton.show();
+      tg.MainButton.onClick(() => goTo('s-create'));
+    } catch(e){}
+  }
+
+  /* ── 2. Generate unique user ID ── */
+  const tgUser = tg?.initDataUnsafe?.user;
+  let uid = localStorage.getItem('tomx016_uid');
+  if (!uid) { uid = 'u' + Date.now() + Math.random().toString(36).slice(2,7); localStorage.setItem('tomx016_uid', uid); }
+  ME.uid = tgUser ? String(tgUser.id) : uid;
+
+  /* ── 3. Load profile ── */
+  const p = Profile.get();
+  ME.name = p.name; ME.avatar = p.avatar; ME.tg = p.tg;
+  $('hav').textContent = p.avatar;
+  $('hname').textContent = p.name;
+
+  /* ── 4. Preview code ── */
+  $('preview-code').textContent = genCode();
+
+  /* ── 5. Init Firebase ── */
+  const bar = $('lbar'), status = $('lstatus');
+  let prog = 0;
+  const pInt = setInterval(() => { prog += (10 + Math.random()*10); if (prog>80) prog=80; bar.style.width=prog+'%'; }, 130);
+
+  const fbOk = initFirebase();
+  if (!fbOk) {
+    status.textContent = '⚠️ Firebase config needed – see code comments';
+    clearInterval(pInt); bar.style.width='100%';
+    setTimeout(() => {
+      goTo('s-home'); $('bnav').style.display='flex';
+      toast('⚠️ Add your Firebase config to use multiplayer!', 5000);
+    }, 1500);
+    return;
+  }
+
+  status.textContent = 'Connected to Firebase ✅';
+  clearInterval(pInt); bar.style.width='100%';
+  setTimeout(() => {
+    goTo('s-home'); $('bnav').style.display='flex';
+  }, 700);
+
+  /* ── 6. Auto-join via Telegram start_param ── */
+  const startParam = tg?.initDataUnsafe?.start_param;
+  if (startParam && startParam.length >= 4) {
+    setTimeout(() => {
+      $('join-code').value = startParam.toUpperCase();
+      goTo('s-join');
+      toast('📱 Room code detected: '+startParam);
+    }, 900);
+  }
+
+  /* ── 7. Auto-join via URL hash ── */
+  const hash = window.location.hash.slice(1).toUpperCase();
+  if (hash.length >= 4 && !startParam) {
+    setTimeout(() => {
+      $('join-code').value = hash;
+      goTo('s-join');
+    }, 900);
+  }
+
+  // Share LB entry to Firebase
+  setTimeout(() => {
+    const s = Profile.stats();
+    if (s.games > 0 && fbReady) {
+      lbRef().child(ME.uid).set({ name:ME.name,avatar:ME.avatar,pts:s.pts,wins:s.wins,kills:s.kills||0,uid:ME.uid });
+    }
+  }, 3000);
+
+  // Load tournament list
+  setTimeout(() => { if (fbReady) Tourney.load(); }, 2000);
+});
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     📱 TELEGRAM BOT SETUP GUIDE (read this section)
+══════════════════════════════════════════════════════════════
+
+HOW TO ADD THIS GAME TO YOUR TELEGRAM BOT
+==========================================
+
+STEP 1: Deploy this file
+  - Upload index.html to Vercel: https://vercel.com (free)
+  - Or Netlify: https://netlify.com (free, drag & drop)
+  - You get a URL like: https://tomx016.vercel.app
+
+STEP 2: Set up Firebase
+  1. Go to https://console.firebase.google.com
+  2. Create a new project
+  3. Enable "Realtime Database"
+  4. Set database rules (for dev):
+     {
+       "rules": {
+         ".read": true,
+         ".write": true
+       }
+     }
+  5. Go to Project Settings → Add Web App
+  6. Copy the firebaseConfig object
+  7. Replace FB_CONFIG in this file with your values
+  8. Redeploy
+
+STEP 3: Create Telegram Bot (if you don't have one)
+  - Message @BotFather on Telegram
+  - /newbot → follow instructions → save your BOT_TOKEN
+
+STEP 4: Register your game URL as a Mini App
+  - Message @BotFather
+  - /newapp  (or /mybots → select bot → Bot Menu Button)
+  - Set the URL to your Vercel/Netlify URL
+  - Set Menu Button text to: 🎲 Play Ludo
+
+STEP 5: Add the web_app button in your bot
+  Use this Python example (bot.py):
+
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+    from telegram.ext import Application, CommandHandler, ContextTypes
+
+    BOT_TOKEN = "8699540173:AAEPW5Sf3ndXF3SnKkm4q6DjmTmir-s1aVQ"
+    GAME_URL  = "https://tomx016.vercel.app"
+
+    async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+        user = update.effective_user
+        args = ctx.args
+        room_code = args[0] if args else None
+        url = f"{GAME_URL}#{room_code}" if room_code else GAME_URL
+        keyboard = [[InlineKeyboardButton("🎲 Play Ludo", web_app=WebAppInfo(url=url))]]
+        await update.message.reply_text(
+            f"👋 Hello {user.first_name}!\n🎲 Play Ludo with your friends!",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def play(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+        # /play command – opens game
+        keyboard = [[InlineKeyboardButton("🎮 Open Game", web_app=WebAppInfo(url=GAME_URL))]]
+        await update.message.reply_text("Tap to start playing:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("play", play))
+    app.run_polling()
+
+STEP 6: Group gameplay (play with group members)
+  In a group chat, type: /play@YourBotUsername
+  OR: Share the room invite link from inside the game
+
+HOW TO GET DATA FROM FIREBASE (Bot Commands)
+============================================
+These bot commands let you query Firebase via Telegram:
+
+PYTHON FIREBASE ADMIN SETUP:
+    pip install firebase-admin
+    Download serviceAccountKey.json from Firebase Console
+    → Project Settings → Service Accounts → Generate new key
+
+EXAMPLE BOT COMMANDS:
+
+    import firebase_admin
+    from firebase_admin import credentials, db
+
+    cred = credentials.Certificate("serviceAccountKey.json")
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://tomx016-default-rtdb.firebaseio.com/'
+    })
+
+    # /leaderboard command
+    async def leaderboard(update, ctx):
+        ref = db.reference('leaderboard')
+        data = ref.order_by_child('pts').limit_to_last(10).get()
+        if not data:
+            await update.message.reply_text("No data yet!")
+            return
+        sorted_players = sorted(data.values(), key=lambda x: x.get('pts',0), reverse=True)
+        msg = "🏆 TOP 10 PLAYERS:\n\n"
+        for i, p in enumerate(sorted_players, 1):
+            msg += f"{i}. {p['avatar']} {p['name']} — {p['pts']} pts ({p['wins']} wins)\n"
+        await update.message.reply_text(msg)
+
+    # /stats @username command
+    async def stats(update, ctx):
+        # Query by username stored in profile
+        ref = db.reference('leaderboard')
+        all_data = ref.get() or {}
+        username_query = ctx.args[0].lstrip('@') if ctx.args else None
+        found = [v for v in all_data.values() if username_query and username_query.lower() in v.get('name','').lower()]
+        if found:
+            p = found[0]
+            msg = f"📊 Stats for {p['name']}:\n🏆 Wins: {p['wins']}\n🎮 Points: {p['pts']}\n💀 Kills: {p.get('kills',0)}"
+        else:
+            msg = "Player not found."
+        await update.message.reply_text(msg)
+
+    # /rooms command – active rooms
+    async def rooms(update, ctx):
+        ref = db.reference('rooms')
+        data = ref.get() or {}
+        active = [v for v in data.values() if v.get('status') == 'lobby']
+        msg = f"🎮 {len(active)} open room(s):\n\n"
+        for r in active[:5]:
+            pcount = len(r.get('players',{}))
+            msg += f"• {r['name']} [{pcount}/{r['maxPlayers']}] — Code: {r['code']}\n"
+        await update.message.reply_text(msg or "No open rooms")
+
+    app.add_handler(CommandHandler("leaderboard", leaderboard))
+    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("rooms", rooms))
+
+FIREBASE DATABASE STRUCTURE:
+  rooms/
+    {roomCode}/
+      name, code, maxPlayers, timer, status
+      players/
+        {uid}/ → name, avatar, color, uid
+      state/   → full game state (synced in real-time)
+      chat/    → chat messages
+
+  leaderboard/
+    {uid}/ → name, avatar, pts, wins, kills
+
+  tournaments/
+    {id}/ → name, host, maxP, prize, players
+
+═══════════════════════════════════════════════════════════ -->
+</body>
+</html>
